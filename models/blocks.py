@@ -18,7 +18,6 @@ class ConvBLock(nn.Module):
         return self.layers(x)
 
 
-
 def get_activation(activation):
     if activation == 'relu':
         return nn.ReLU()
