@@ -116,10 +116,13 @@ class GRN(nn.Module):
 
     def __init__(self, dim):
         super().__init__()
-        self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim))
-        self.beta = nn.Parameter(torch.zeros(1, 1, 1, dim))
+        self.gamma = nn.Parameter(torch.zeros(1, dim, 1))
+        self.beta = nn.Parameter(torch.zeros(1, dim, 1))
 
     def forward(self, x):
-        Gx = torch.norm(x, p=2, dim=(1, 2), keepdim=True)
+        shape = x.shape
+        x = x.flatten(-2)
+        Gx = torch.norm(x, p=2, dim=(-1), keepdim=True)
         Nx = Gx / (Gx.mean(dim=-1, keepdim=True) + 1e-6)
-        return self.gamma * (x * Nx) + self.beta + x
+        x = self.gamma * (x * Nx) + self.beta + x
+        return x.reshape(*shape)
