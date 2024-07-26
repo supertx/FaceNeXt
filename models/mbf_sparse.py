@@ -17,7 +17,7 @@ from MinkowskiOps import (
 )
 
 from models import ConvBlock
-from models.utils import (
+from models.blocks import (
     LayerNorm,
     MinkowskiLayerNorm,
     MinkowskiGRN,
@@ -48,15 +48,15 @@ class DepthWise(nn.Module):
     ConvNeXtv2 could take into account afterward
     """
 
-    def __init__(self, in_channels, out_channels, residual=True, groups=1, D=2):
+    def __init__(self, in_channels, out_channels, residual=True, groups=1, D=2, inner_scale=1):
         super().__init__()
         self.residual = residual
         self.layers = nn.ModuleList()
         self.layers.extend(
-            [MinkowskiConvolution(in_channels, groups, kernel_size=1, stride=1, bias=True, dimension=D),
-             MinkowskiLayerNorm(groups, 1e-6),
-             MinkowskiDepthwiseConvolution(groups, kernel_size=3, bias=True, dimension=D),
-             MinkowskiConvolution(groups, out_channels, kernel_size=1, stride=1, bias=True, dimension=D),
+            [MinkowskiConvolution(in_channels, inner_scale * groups, kernel_size=1, stride=1, bias=True, dimension=D),
+             MinkowskiLayerNorm(inner_scale * groups, 1e-6),
+             MinkowskiDepthwiseConvolution(inner_scale * groups, kernel_size=3, bias=True, dimension=D),
+             MinkowskiConvolution(inner_scale * groups, out_channels, kernel_size=1, stride=1, bias=True, dimension=D),
              MinkowskiGELU(),
              MinkowskiGRN(out_channels)]
         )
@@ -64,7 +64,7 @@ class DepthWise(nn.Module):
     def forward(self, x):
         y = x
         for layer in self.layers:
-            y = layer(x)
+            x = layer(x)
         if self.residual:
             return y + x
         else:
@@ -73,11 +73,11 @@ class DepthWise(nn.Module):
 
 class StageBlock(nn.Module):
 
-    def __init__(self, channels, num_block, groups, kernel=3, stride=1, padding=1, D=2):
+    def __init__(self, channels, num_block, groups, kernel=3, stride=1, padding=1, D=2, inner_scale=1):
         super().__init__()
         self.layers = nn.ModuleList()
         for _ in range(num_block):
-            self.layers.append(DepthWise(channels, channels, True, groups))
+            self.layers.append(DepthWise(channels, channels, True, groups, inner_scale=inner_scale))
 
     def forward(self, x):
         for layer in self.layers:
@@ -86,13 +86,16 @@ class StageBlock(nn.Module):
 
 
 class MBFSparse(nn.Module):
-    def __init__(self, fp16=False, num_feature=512, stage=(3, 9, 3, 3), stage_channel=(128, 128, 256, 256), D=2):
+    def __init__(self, fp16=False, num_feature=512,
+                 stage=(3, 9, 3, 3), stage_channel=(128, 128, 256, 256),
+                 D=2, inner_scale=1):
         super().__init__()
         self.fp16 = fp16
         self.stem = ConvBlock(in_channels=3, out_channels=128, kernel_size=3, stride=2, padding=1)
         self.stage_channel = stage_channel
         self.down_sample = nn.ModuleList()
         self.stages = nn.ModuleList()
+        self.inner_scale = inner_scale
 
         for i in range(len(stage)):
             self.stages.append(StageBlock(self.stage_channel[i], stage[i], self.stage_channel[i], D=D))

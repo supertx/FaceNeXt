@@ -17,8 +17,9 @@ class Decoder(nn.Module):
             out_channels=decoder_embed_dim,
             kernel_size=1
         )
+
         self.mask_token = nn.Parameter(torch.zeros(1, decoder_embed_dim, 1, 1))
-        decoder = [DepthWise(decoder_embed_dim, decoder_embed_dim, residual=True) for _ in range(decoder_depth)]
+        decoder = [DepthWise(decoder_embed_dim, decoder_embed_dim, residual=True, groups=decoder_embed_dim, inner_scale=4) for _ in range(decoder_depth)]
         self.decoder = nn.Sequential(*decoder)
         self.pred = nn.Conv2d(
             in_channels=decoder_embed_dim,
@@ -36,7 +37,7 @@ class Decoder(nn.Module):
 
     def forward(self, x, mask):
         x = self.proj(x)
-        mask = mask.reshape(-1, *x.shape[2:]).type_as(x)
+        mask = mask.reshape(-1, *x.shape[2:]).unsqueeze(1).type_as(x)
         mask_token = self.mask_token.repeat(x.shape[0], 1, x.shape[2], x.shape[3])
         x = x * (1 - mask) + mask_token * mask
         x = self.decoder(x)
@@ -46,22 +47,26 @@ class Decoder(nn.Module):
 
 class FaceMAE(nn.Module):
     def __init__(self,
-                 depth=(3, 3, 9, 3),
-                 dims=(128, 128, 256, 256),
+                 depth=(9, 9, 27, 9),
+                 dims=(128, 256, 512, 512),
                  decoder_depth=1,
                  decoder_embed_dim=512,
                  patch_size=16,
                  mask_ratio=0.6,
-                 norm_pix_loss=False,
+                 norm_pix_loss=True,
+                 inner_scale=1
                  ):
         super().__init__()
         self.patch_size = patch_size
         self.mask_ratio = mask_ratio
         self.norm_pix_loss = norm_pix_loss
-        self.encoder = MBFSparse(stage=depth, stage_channel=dims)
+        self.inner_scale = inner_scale
+        self.encoder = MBFSparse(stage=depth, stage_channel=dims, inner_scale=inner_scale)
 
-        self.decoder = Decoder(in_channels=decoder_embed_dim, decoder_embed_dim=decoder_embed_dim,
-                               decoder_depth=decoder_depth, patch_size=patch_size)
+        self.decoder = Decoder(in_channels=decoder_embed_dim,
+                               decoder_embed_dim=decoder_embed_dim,
+                               decoder_depth=decoder_depth,
+                               patch_size=patch_size)
 
     def get_random_mask(self, x_shape, mask_ratio, device):
         patch_num = (x_shape[2] // self.patch_size) ** 2
@@ -91,15 +96,16 @@ class FaceMAE(nn.Module):
 
     def unpatchify(self, x):
         """
-        x: (N, L, patch_size**2 * C)
+        x: (N, patchsize ** 2 * C, h, w)
         return: (N, C, H, W)
         """
-        h = w = int(x.shape[1] ** .5)
-        assert h * w == x.shape[1]
+        p = self.patch_size
+        h = w = int(x.shape[2])
+        # assert h * w == x.shape[1]
 
-        x = x.reshape(x.shape[0], h, w, self.patch_size, self.patch_size, x.shape[2] // (self.patch_size ** 2))
-        x = torch.einsum('nhwpqc->nchpwq', x)
-        img = x.reshape(x.shape[0], 3, h * self.patch_size, w * self.patch_size)
+        x = x.reshape(shape=(x.shape[0], p, p, 3, h, w))
+        x = torch.einsum('npqchw->nchpwq', x)
+        img = x.reshape(x.shape[0], 3, h * p, w * p)
         return img
 
     def compute_loss(self, imgs, pred, mask):
@@ -113,11 +119,12 @@ class FaceMAE(nn.Module):
             pred = pred.reshape(n, c, -1)
             pred = torch.einsum('ncl->nlc', pred)
         target = self.patchify(imgs)
+        # 根据每个patch进行归一化
         if self.norm_pix_loss:
             mean = target.mean(dim=-1, keepdim=True)
             var = target.var(dim=-1, keepdim=True)
             target = (target - mean) / (var + 1e-6) ** .5
-        loss = (target - pred) ** 2
+        loss = (pred - target) ** 2
         loss = loss.mean(dim=-1)
         loss = (loss * mask).sum() / mask.sum()
         return loss

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="power@172.18.128.32:22 password)" remoteFilesAllowedToDisappearOnAutoupload="false" showAutoUploadSettingsWarning="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="power@172.18.128.32:22 password" remoteFilesAllowedToDisappearOnAutoupload="false" showAutoUploadSettingsWarning="false">
     <serverData>
       <paths name="amax@172.18.144.9:10034 password">
         <serverdata>
@@ -13,6 +13,13 @@
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="power@172.18.128.32:22 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/power/tx/FaceNeXt" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

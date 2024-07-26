@@ -3,7 +3,7 @@
   <component name="Black">
     <option name="sdkName" value="Remote Python 3.8.19 (sftp://power@172.18.128.32:22/home/power/anaconda3/envs/tx/bin/python3.8)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="sparse_compute" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Remote Python 3.8.19 (sftp://power@172.18.128.32:22/home/power/anaconda3/envs/sparse_compute/bin/python3.8)" project-jdk-type="Python SDK" />
   <component name="PyPackaging">
     <option name="earlyReleasesAsUpgrades" value="true" />
   </component>

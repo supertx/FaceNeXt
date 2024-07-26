@@ -136,7 +136,7 @@ class MobileFaceNet(Module):
             for func in self.layers:
                 x = func(x)
         x = self.conv_sep(x.float() if self.fp16 else x)
-        x = self.features(x)
+        # x = self.features(x)
         return x
 
 

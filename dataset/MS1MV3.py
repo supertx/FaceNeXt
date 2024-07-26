@@ -51,5 +51,5 @@ class MXFaceDataset(Dataset):
         return sample, label
 
     def __len__(self):
-        return 10000
+        return 100000
         # return len(self.imgidx)
