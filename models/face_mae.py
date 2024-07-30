@@ -61,7 +61,7 @@ class FaceMAE(nn.Module):
         self.mask_ratio = mask_ratio
         self.norm_pix_loss = norm_pix_loss
         self.inner_scale = inner_scale
-        self.encoder = MBFSparse(stage=depth, stage_channel=dims, inner_scale=inner_scale)
+        self.encoder = MBFSparse(stages=depth, stages_channel=dims, inner_scale=inner_scale)
 
         self.decoder = Decoder(in_channels=decoder_embed_dim,
                                decoder_embed_dim=decoder_embed_dim,

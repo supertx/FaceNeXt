@@ -7,11 +7,16 @@ import logging
 import os
 
 
-def get_config(config_path):
+def get_config(config_path, is_pretrain=False):
     config = Dict()
-    with open("./config/base.yml", "r") as f:
-        base = yaml.load(f, Loader=yaml.FullLoader)
-        config.update(base)
+    if is_pretrain:
+        with open("./config/pretrain_base.yml", "r") as f:
+            base = yaml.load(f, Loader=yaml.FullLoader)
+            config.update(base)
+    else:
+        with open("./config/finetune_base.yml", "r") as f:
+            base = yaml.load(f, Loader=yaml.FullLoader)
+            config.update(base)
     assert os.path.isfile(os.path.join("./config", config_path)), f"{config_path} not found"
     with open(os.path.join("./config", config_path), "r") as f:
         load = yaml.load(f, Loader=yaml.FullLoader)

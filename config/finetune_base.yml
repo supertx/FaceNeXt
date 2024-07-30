@@ -1,8 +1,8 @@
 solver:
   warmup_epoch: 5
-  base_lr: 0.0015
+  base_lr: 0.001
   min_lr: 0.0
-  epochs: 100
+  epochs: 30
   weight_decay: 0.01
   momentum: 0.9
   type: "AdamW"
@@ -20,9 +20,15 @@ resume:
   resume_path: ""
 model:
   name: "faceNeXt_tiny"
-  depth: [ 3, 3, 9, 3]
-  dims: [ 128, 128, 256, 256]
+  depth: [ 3, 3, 9, 3 ]
+  dims: [ 128, 128, 256, 256 ]
   inner_scale: 1
-  decoder_depth: 1
-  mask_ratio: 0.6
-print_model: True
+  s: 64
+  m: (1.0, 0.5, 0)
+  pretrain_path: "/home/power/tx/FaceNeXt/logs/0726_1637_faceNeXt_tiny/model_100.pth"
+eval:
+#  eval_datasets: [ 'lfw', 'agedb_30', 'cfp_fp' ]
+  eval_datasets: [ 'lfw' ]
+  bin_root: "/data/tx/MS1MV3/"
+
+print_model: False

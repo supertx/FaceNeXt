@@ -1,0 +1,7 @@
+model:
+  name: "faceNeXt_middle"
+  depth: [ 3, 3, 27, 3 ]
+  dims: [ 128, 128, 256, 256 ]
+  inner_scale: 1
+  decoder_depth: 1
+  mask_ratio: 0.6

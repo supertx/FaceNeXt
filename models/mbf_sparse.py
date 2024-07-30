@@ -33,7 +33,8 @@ class DownSampleLayer(nn.Module):
             MinkowskiLayerNorm(in_channels, 1e-6)
         )
         self.layer.append(
-            MinkowskiConvolution(in_channels, out_channels, kernel_size, stride, bias=True, dimension=D)
+            MinkowskiConvolution(in_channels, out_channels, kernel_size, stride, bias=True,
+                                 dimension=D)
         )
 
     def forward(self, x):
@@ -73,11 +74,11 @@ class DepthWise(nn.Module):
 
 class StageBlock(nn.Module):
 
-    def __init__(self, channels, num_block, groups, kernel=3, stride=1, padding=1, D=2, inner_scale=1):
+    def __init__(self, channels, num_block, groups, D=2, inner_scale=1):
         super().__init__()
         self.layers = nn.ModuleList()
         for _ in range(num_block):
-            self.layers.append(DepthWise(channels, channels, True, groups, inner_scale=inner_scale))
+            self.layers.append(DepthWise(channels, channels, True, groups, D=D, inner_scale=inner_scale))
 
     def forward(self, x):
         for layer in self.layers:
@@ -87,25 +88,25 @@ class StageBlock(nn.Module):
 
 class MBFSparse(nn.Module):
     def __init__(self, fp16=False, num_feature=512,
-                 stage=(3, 9, 3, 3), stage_channel=(128, 128, 256, 256),
+                 stages=(3, 3, 9, 3), stages_channel=(128, 128, 256, 256),
                  D=2, inner_scale=1):
         super().__init__()
         self.fp16 = fp16
         self.stem = ConvBlock(in_channels=3, out_channels=128, kernel_size=3, stride=2, padding=1)
-        self.stage_channel = stage_channel
+        self.stages_channel = stages_channel
+        self.stages = stages
         self.down_sample = nn.ModuleList()
-        self.stages = nn.ModuleList()
-        self.inner_scale = inner_scale
+        self.stage_blocks = nn.ModuleList()
 
-        for i in range(len(stage)):
-            self.stages.append(StageBlock(self.stage_channel[i], stage[i], self.stage_channel[i], D=D))
-
-        for i in range(len(stage) - 1):
+        for i in range(len(stages) - 1):
             self.down_sample.append(
-                DownSampleLayer(self.stage_channel[i], self.stage_channel[i + 1], 3, 2))
+                DownSampleLayer(stages_channel[i], stages_channel[i + 1], 3, 2))
 
-        self.conv_sep = MinkowskiConvolution(self.stage_channel[-1],
-                                             512, kernel_size=1, stride=1, bias=True, dimension=D)
+        for i in range(len(stages)):
+            self.stage_blocks.append(StageBlock(stages_channel[i], stages[i], stages_channel[i], D=D, inner_scale=inner_scale))
+
+        self.conv_sep = MinkowskiConvolution(stages_channel[-1],
+                                             num_feature, kernel_size=1, stride=1, bias=True, dimension=D)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -141,7 +142,7 @@ class MBFSparse(nn.Module):
         x = to_sparse(x, format="BCXX")
 
         for i in range(len(self.stages)):
-            x = self.stages[i](x)
+            x = self.stage_blocks[i](x)
             if i < len(self.down_sample):
                 x = self.down_sample[i](x)
         x = self.conv_sep(x)

@@ -1,0 +1,28 @@
+solver:
+  warmup_epoch: 5
+  base_lr: 0.0015
+  min_lr: 0.0
+  epochs: 50
+  weight_decay: 0.01
+  momentum: 0.9
+  type: "AdamW"
+dataset:
+  data_dir: "/data/tx/MS1MV3"
+  batch_size: 256
+  num_workers: 16
+  num_classes: 85742
+  patch_size: 16
+train:
+  log_dir: "./logs/"
+  show_interval: 1
+resume:
+  is_resume: False
+  resume_path: ""
+model:
+  name: "faceNeXt_tiny"
+  depth: [ 3, 3, 9, 3]
+  dims: [ 128, 128, 256, 256]
+  inner_scale: 1
+  decoder_depth: 1
+  mask_ratio: 0.6
+print_model: False
