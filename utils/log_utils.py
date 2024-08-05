@@ -54,7 +54,7 @@ class EvaluateLogger:
         model.eval()
         for name, bin in self.eval_bins.items():
             acc, std, xnorm = test(bin, model)[2: 5]
-            self.log_file.write(f"epoch : {epoch} \t {name} : acc {acc * 100:.2f}% std: {std:.2f} xnorm: {xnorm:.2f}\n")
+            self.log_file.write(f"epoch : {epoch} \t {name} : acc {acc * 100:.2f}% \t std: {std:.2f} \t xnorm: {xnorm:.2f}\n")
             self.log_file.write("\n")
             logger.log_scalar(name, acc, epoch)
         logger.flush()

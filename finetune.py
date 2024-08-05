@@ -4,12 +4,11 @@
 finetune the pretrain model(self-supervised)
 """
 import os
-from collections import OrderedDict
 from datetime import datetime
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from torch.cuda.amp import autocast, GradScaler
 
 from models import MBF, ArcHead
 from dataset import getDataloader
@@ -21,7 +20,7 @@ from utils import (organize_model_weights,
                    EvaluateLogger)
 
 
-def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, cfg):
+def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp,  cfg):
     model.train()
     t = tqdm(dataloader, desc=f"Epoch: {epoch}/{cfg.solver.epochs} lr: 0.0 loss: 0.0", ncols=120)
     log_dict = {}
@@ -30,22 +29,32 @@ def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, cfg):
         img = img.cuda()
         label = label.cuda()
         optimizer.zero_grad()
-        logit = model(img)
-        loss = head(logit, label)
-        loss.backward()
-        optimizer.step()
+        if cfg.solver.fp16:
+            with autocast():
+                logit = model(img)
+                loss = head(logit, label)
+                amp.scale(loss).backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                amp.step(optimizer)
+                amp.update()
+        else:
+            logit = model(img)
+            loss = head(logit, label)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+            optimizer.step()
         torch.cuda.empty_cache()
         t.desc = f"Epoch: {epoch}/{cfg.solver.epochs} lr: {optimizer.param_groups[0]['lr']:.2} loss: {loss.item()}"
         log_dict['loss'] = loss.item()
         log_dict['lr'] = optimizer.param_groups[0]['lr']
-        logger.log_everything(log_dict, epoch * len(dataloader) + step_in_epoch)
+        logger.log_everything(log_dict, (epoch - 1) * len(dataloader) + step_in_epoch)
     logger.flush()
     t.close()
 
 
 def train(args):
     # load config file
-    cfg = get_config(args.config)
+    cfg = get_config(args.config, is_pretrain=False)
     print_config(cfg)
     # make log dir
     log_dir = os.path.join(cfg.train.log_dir,
@@ -56,6 +65,7 @@ def train(args):
                                      bin_root=cfg.eval.bin_root,
                                      cfg=cfg)
 
+    amp = GradScaler()
     # get dataloader
     dataloader = getDataloader(cfg.dataset.data_dir,
                                cfg.dataset.batch_size,
@@ -95,7 +105,7 @@ def train(args):
         state_epoch = check_point["epoch"]
 
     for epoch in range(state_epoch, cfg.solver.epochs):
-        train_one_epoch(model, head, optimizer, dataloader, epoch, logger, cfg)
+        train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp, cfg)
         evaluate_logger.evaluate(model, logger, epoch)
 
         if epoch % 5 == 0:

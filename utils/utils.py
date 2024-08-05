@@ -67,3 +67,10 @@ def organize_model_weights(state_dict):
             new_state_dict[key] = value.unsqueeze(-1)
 
     return new_state_dict
+
+
+def weights_to_sparse(state_dict):
+    """
+    input state_dict is non-sparse model params, out put a sparse model params
+
+    """

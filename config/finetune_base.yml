@@ -1,16 +1,17 @@
 solver:
   warmup_epoch: 5
-  base_lr: 0.001
+  base_lr: 0.0001
   min_lr: 0.0
   epochs: 30
-  weight_decay: 0.01
+  weight_decay: 0.0005
   momentum: 0.9
   type: "AdamW"
+  fp16: True
 dataset:
   data_dir: "/data/tx/MS1MV3"
   batch_size: 256
   num_workers: 16
-  num_classes: 85742
+  num_classes: 93431
   patch_size: 16
 train:
   log_dir: "./logs/"
@@ -25,10 +26,10 @@ model:
   inner_scale: 1
   s: 64
   m: (1.0, 0.5, 0)
-  pretrain_path: "/home/power/tx/FaceNeXt/logs/0726_1637_faceNeXt_tiny/model_100.pth"
+  pretrain_path: "/home/power/tx/FaceNeXt/logs/0730_1709_faceNeXt_tiny_pretrain/model_20.pth"
 eval:
-#  eval_datasets: [ 'lfw', 'agedb_30', 'cfp_fp' ]
-  eval_datasets: [ 'lfw' ]
+  eval_datasets: [ 'lfw', 'agedb_30', 'cfp_fp' ]
+#  eval_datasets: [ 'lfw' ]
   bin_root: "/data/tx/MS1MV3/"
 
-print_model: False
+print_model: True

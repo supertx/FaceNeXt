@@ -36,7 +36,7 @@ def train_one_epoch(model, dataloader, optimizer, epoch, logger, cfg):
         t.desc = f"Epoch {epoch}/{cfg.solver.epochs} lr: {optimizer.param_groups[0]['lr']:.2} loss: {loss.item()}"
         log_dict['loss'] = loss.item()
         log_dict['lr'] = optimizer.param_groups[0]['lr']
-        logger.log_everything(log_dict, epoch * len(dataloader) + step_in_epoch)
+        logger.log_everything(log_dict, (epoch - 1) * len(dataloader) + step_in_epoch)
     else:
         if show_flag:
             show(mask[0], img[0], pred[0], epoch, logger, cfg)
@@ -46,7 +46,7 @@ def train_one_epoch(model, dataloader, optimizer, epoch, logger, cfg):
 
 def train(args):
     # load config file
-    cfg = get_config(args.config)
+    cfg = get_config(args.config, is_pretrain=True)
     print_config(cfg)
     # make log dir
     log_dir = os.path.join(cfg.train.log_dir,

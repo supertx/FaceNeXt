@@ -101,13 +101,13 @@ class MBF(nn.Module):
                 m.bias.data.zero_()
 
     def forward(self, x):
+        # with torch.cuda.amp.autocast(self.fp16):
         x = self.stem(x)
         for i in range(len(self.stages)):
             x = self.stage_blocks[i](x)
             if i < len(self.stages) - 1:
                 x = self.down_sample[i](x)
         x = self.conv_sep(x)
-
         x = self.features(x)
         return x
 

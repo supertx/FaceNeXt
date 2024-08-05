@@ -2,7 +2,7 @@ solver:
   warmup_epoch: 5
   base_lr: 0.0015
   min_lr: 0.0
-  epochs: 50
+  epochs: 20
   weight_decay: 0.01
   momentum: 0.9
   type: "AdamW"
