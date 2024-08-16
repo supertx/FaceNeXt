@@ -7,7 +7,7 @@ import os
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
-from dataset.MS1MV3 import MXFaceDataset
+from dataset.mx_face_dataset import MXFaceDataset
 
 
 def getDataloader(data_dir, batch_size, num_workers=4, is_train=True):

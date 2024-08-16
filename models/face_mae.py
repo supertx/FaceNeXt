@@ -7,6 +7,7 @@ import torch
 from torch import nn
 
 from models import DepthWise, MBFSparse
+from utils import generate_landmark_mask
 
 
 class Decoder(nn.Module):
@@ -52,12 +53,14 @@ class FaceMAE(nn.Module):
                  decoder_depth=1,
                  decoder_embed_dim=512,
                  patch_size=16,
+                 mask_landmark_num=4,
                  mask_ratio=0.6,
                  norm_pix_loss=True,
                  inner_scale=1
                  ):
         super().__init__()
         self.patch_size = patch_size
+        self.mask_landmark_num = mask_landmark_num
         self.mask_ratio = mask_ratio
         self.norm_pix_loss = norm_pix_loss
         self.inner_scale = inner_scale
@@ -129,18 +132,14 @@ class FaceMAE(nn.Module):
         loss = (loss * mask).sum() / mask.sum()
         return loss
 
-    def forward(self, imgs):
-        mask = self.get_random_mask(imgs.shape, self.mask_ratio, imgs.device)
+    def forward(self, imgs, anno):
+        mask = generate_landmark_mask(imgs.shape[2], self.patch_size, anno,
+                                      mask_landmark_num=self.mask_landmark_num, mask_ratio=self.mask_ratio)
         x = self.encoder(imgs, mask)
         pred = self.decoder(x, mask)
-        loss = self.compute_loss(imgs, pred, mask)
-        return loss, pred, mask
+        # loss = self.compute_loss(imgs, pred, mask)
+        # return loss, pred, mask
+        return self.unpatchify(pred), mask
 
 
-if __name__ == '__main__':
-    mae = FaceMAE()
-    mae.cuda()
-    loss, pred, mask = mae(torch.randn(1, 3, 112, 112).cuda())
-    print(f"loss: {loss}")
-    print(f"pred shape: {pred.shape}")
-    print(f"mask: {mask}")
+

@@ -14,18 +14,25 @@ from torch.nn import functional as F
 def margin_logit(logits, s, m1, m2, m3, label):
     """
     base on official arcface-torch code
+    FIXME debug
     """
     # select the target logit
     target_logit = logits[:, label.view(-1)]
-    if m2 != 0:
+    if m2 > 0:
         # arcFace margin
-        target_logit_ = target_logit.detach()
-        logits_ = logits.detach()
-        logits_ = torch.acos(logits_)
-        target_logit_ = torch.acos(target_logit_)
-        target_logit_ = target_logit_ + m2
-        logits_[:, label.view(-1)] = target_logit_
-        logits_.cos_()
+        # logits_ = logits.detach()
+        # target_logit_ = target_logit.detach()
+        # logits_ = torch.acos(logits_)
+        # target_logit_ = torch.acos(target_logit_)
+        # target_logit_ = target_logit + m2
+        # logits_[:, label.view(-1)] = target_logit_
+        # logits_.cos_()
+        with torch.no_grad():
+            target_logit.arcos_()
+            logits.arccos_()
+            final_target_logit = target_logit + m2
+            logits[:, label.view(-1)] = final_target_logit
+            logits.cos_()
         return logits * s
     if m3 > 0:
         # cosFace margin
@@ -45,7 +52,7 @@ def margin_logit_v2(logits, s, m1, m2, m3, label):
     sin_m = math.sin(m2)
     th = math.cos(math.pi - m2)
     mm = math.sin(math.pi - m2) * m2
-    sine = torch.sqrt((1.0 - torch.pow(logits, 2)).clamp(0, 1))
+    sine = torch.sqrt((1.0 - torch.pow(logits, 2)).clamp(0, 1)).half()
     phi = logits * cos_m - sine * sin_m
     phi = torch.where(logits > th, phi, logits - mm)
     one_hot = torch.zeros_like(logits).to(logits.device)
@@ -73,7 +80,7 @@ class ArcHead(nn.Module):
     def forward(self, logit, label=None):
         feature = F.linear(F.normalize(logit), F.normalize(self.weight))
         feature = feature.clamp(-1, 1)
-        feature = margin_logit(feature, self.s, *self.m, label)
+        feature = margin_logit_v2(feature, self.s, *self.m, label)
         if self.training:
             return self.forward_loss(feature, label)
         else:

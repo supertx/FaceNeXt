@@ -25,11 +25,12 @@ def train_one_epoch(model, dataloader, optimizer, epoch, logger, cfg):
     if epoch % cfg.train.show_interval == 0:
         show_flag = True
     log_dict = {}
-    for step_in_epoch, (img, _) in enumerate(t):
+    for step_in_epoch, (img, anno, _) in enumerate(t):
         adjust_learning_rate(optimizer, step_in_epoch / len(dataloader) + epoch, cfg)
         img = img.cuda()
+        anno.cuda()
         optimizer.zero_grad()
-        loss, pred, mask = model(img)
+        loss, pred, mask = model(img, anno)
         loss.backward()
         optimizer.step()
         torch.cuda.empty_cache()

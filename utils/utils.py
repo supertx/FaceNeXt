@@ -1,7 +1,9 @@
 import math
+import random
 from collections import OrderedDict
 
 import torch
+from torch.nn import functional as F
 
 
 def unpatchify(x, p):
@@ -67,6 +69,60 @@ def organize_model_weights(state_dict):
             new_state_dict[key] = value.unsqueeze(-1)
 
     return new_state_dict
+
+
+def __generate_mask(img_size, patch_size, anno, mask_landmark_num=4):
+    """
+        generate mask for landmark points
+        randomly mask 4 points in 5 points
+        input anno: (14)
+        """
+    if isinstance(img_size, tuple):
+        img_size = img_size[0]
+    if isinstance(patch_size, tuple):
+        patch_size = patch_size[0]
+    patch_num = img_size // patch_size
+    masked_x = torch.empty((5,), dtype=torch.int8)
+    masked_y = torch.empty((5,), dtype=torch.int8)
+    for i in range(5):
+        masked_y[i] = anno[2 * i + 4] * 7 / img_size
+        masked_x[i] = anno[2 * i + 5] * 7 / img_size
+    # random sample 4 points
+    indices = random.sample(range(5), mask_landmark_num)
+    masked_x = masked_x[indices]
+    masked_y = masked_y[indices]
+    mask = torch.full((patch_num, patch_num), 1, dtype=torch.float32)
+    for x, y in zip(masked_x, masked_y):
+        mask[int(x), int(y)] = 0
+    return mask
+
+
+def generate_landmark_mask(img_size, patch_size, anno, mask_landmark_num=4, mask_ratio=0.6):
+    """
+    generate mask for landmark points
+    randomly mask 4 points in 5 points
+    anno:(bs, 14)
+    """
+    bs = anno.shape[0]
+    if isinstance(img_size, tuple):
+        img_size = img_size[0]
+    if isinstance(patch_size, tuple):
+        patch_size = patch_size[0]
+    patch_num = img_size // patch_size
+    masked_xy = torch.empty((bs, 5), dtype=torch.long)
+    for i in range(5):
+        masked_xy[:, i] = (anno[:, 2 * i + 5] * 7 // img_size) * patch_num + anno[:, 2 * i + 4] * 7 // img_size
+    # random sample 4 points
+    _, indices = torch.randn((bs, 5)).topk(mask_landmark_num, dim=-1)
+    masked_xy_ = masked_xy.masked_select(F.one_hot(indices).sum(-2).bool()).reshape(bs, 4)
+    left_mask_num = int(patch_num * patch_num * mask_ratio) - mask_landmark_num
+    random_n = torch.randn((bs, patch_num ** 2))
+    random_n[torch.arange(bs)[:, None], masked_xy] = -10
+    _, indices = random_n.topk(left_mask_num, dim=-1)
+    indices = torch.cat([indices, masked_xy_], dim=1)
+    mask = torch.full((bs, patch_num * patch_num), 1, dtype=torch.float32)
+    mask[torch.arange(bs)[:, None], indices] = 0
+    return mask
 
 
 def weights_to_sparse(state_dict):

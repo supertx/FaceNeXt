@@ -4,7 +4,7 @@
 """
 from .lr_utils import adjust_learning_rate
 from .config_utils import get_config, print_config
-from .utils import unpatchify, patchify, organize_model_weights
+from .utils import unpatchify, patchify, organize_model_weights, generate_landmark_mask
 from .log_utils import TensorboardLogger, EvaluateLogger
 __all__ = ['adjust_learning_rate',
            'get_config',
@@ -13,4 +13,5 @@ __all__ = ['adjust_learning_rate',
            'patchify',
            'TensorboardLogger',
            'organize_model_weights',
-           'EvaluateLogger']
+           'EvaluateLogger',
+           'generate_landmark_mask']

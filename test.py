@@ -1,54 +1,32 @@
-import numpy as np
-import torch
-import torch.nn as nn
-import MinkowskiEngine as ME
-import MinkowskiEngine.MinkowskiFunctional as MEF
+from models import FaceMAE
+from criterion import PretrainLoss, DiscriminatorLoss, Discriminator
+from utils import get_config
+from dataset import getDataloader
+
+cfg = get_config("pretrain_FaceNeXt_tiny.yml", is_pretrain=True)
+
+dataloader = getDataloader(cfg.dataset.data_dir, cfg.dataset.batch_size,
+                           num_workers=cfg.dataset.num_workers, is_train=True)
+
+model = FaceMAE(depth=cfg.model.depth,
+                dims=cfg.model.dims,
+                decoder_depth=cfg.model.decoder_depth,
+                patch_size=cfg.dataset.patch_size,
+                mask_ratio=cfg.model.mask_ratio,
+                inner_scale=cfg.model.inner_scale)
+discriminator = Discriminator()
+pretrain_loss = PretrainLoss(cfg, discriminator)
+discriminator_loss = DiscriminatorLoss(discriminator)
+model.cuda()
+discriminator.cuda()
 
 
-class ExampleNetwork(ME.MinkowskiNetwork):
-    def __init__(self, in_feat, out_feat, D=3):
-        super(ExampleNetwork, self).__init__(D)
-        self.conv =  ME.MinkowskiConvolution(
-                in_channels=in_feat,
-                out_channels=64,
-                kernel_size=3,
-                stride=2,
-                dilation=1,
-                bias=False,
-                dimension=D)
-        self.bn = ME.MinkowskiBatchNorm(64)
-        self.conv_tr = ME.MinkowskiConvolutionTranspose(
-                in_channels=64,
-                out_channels=4,
-                kernel_size=3,
-                stride=2,
-                dilation=1,
-                bias=False,
-                dimension=D)
-    def forward(self, x):
-        print('input: ', x.coordinates.size(), x.features.size())
-        out = self.conv(x)
-        print('conv: ', out.coordinates.size(), out.features.size())
-        out = self.bn(out)
-        print('bn: ', out.coordinates.size(), out.features.size())
-        out = MEF.relu(out)
-        print('relu: ', out.coordinates.size(), out.features.size())
-        out = self.conv_tr(out)
-        print('conv_tr', out.coordinates.size(), out.features.size())
-        return out
-
-
-if __name__ == '__main__':
-    origin_pc1 = 5 * np.random.uniform(0, 1, (100, 3))
-    feat1 = np.ones((100, 3), dtype=np.float32)
-    origin_pc2 = 100 * np.random.uniform(0, 1, (6, 3))
-    feat2 = np.ones((6, 3), dtype=np.float32)
-
-    coords, feats = ME.utils.sparse_collate([origin_pc1, origin_pc2], [feat1, feat2])
-    input = ME.SparseTensor(feats, coordinates=coords)
-
-    net = ExampleNetwork(in_feat=3, out_feat=32)
-    output = net(input)
-
-    print(torch.equal(input.coordinates, output.coordinates))
-    print(torch.equal(input.features, output.features))
+for img, anno, _ in dataloader:
+    img = img.cuda()
+    anno = anno.cuda()
+    pred, mask = model(img, anno)
+    loss = pretrain_loss(img, pred, mask)
+    loss.backward()
+    loss = discriminator_loss(pred)
+    loss.backward()
+    break

@@ -24,7 +24,7 @@ def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp,  cfg
     model.train()
     t = tqdm(dataloader, desc=f"Epoch: {epoch}/{cfg.solver.epochs} lr: 0.0 loss: 0.0", ncols=120)
     log_dict = {}
-    for step_in_epoch, (img, label) in enumerate(t):
+    for step_in_epoch, (img, _, label) in enumerate(t):
         adjust_learning_rate(optimizer, step_in_epoch / len(dataloader) + epoch, cfg)
         img = img.cuda()
         label = label.cuda()
@@ -34,7 +34,7 @@ def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp,  cfg
                 logit = model(img)
                 loss = head(logit, label)
                 amp.scale(loss).backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), 5)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
                 amp.step(optimizer)
                 amp.update()
         else:
@@ -65,7 +65,7 @@ def train(args):
                                      bin_root=cfg.eval.bin_root,
                                      cfg=cfg)
 
-    amp = GradScaler()
+    amp = GradScaler(init_scale=1024)
     # get dataloader
     dataloader = getDataloader(cfg.dataset.data_dir,
                                cfg.dataset.batch_size,
@@ -108,7 +108,7 @@ def train(args):
         train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp, cfg)
         evaluate_logger.evaluate(model, logger, epoch)
 
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
             torch.save({
                 "model": model.state_dict(),
                 "head": head.state_dict(),
