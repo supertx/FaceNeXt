@@ -4,3 +4,4 @@
 """
 from .criterion import PretrainLoss, DiscriminatorLoss
 from .discriminator import Discriminator
+from .arc_head import ArcHead

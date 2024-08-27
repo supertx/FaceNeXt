@@ -16,9 +16,14 @@ def adjust_learning_rate(optimizer, epoch, cfg):
         lr = cfg_solver.base_lr * epoch / cfg_solver.warmup_epoch
     else:
         lr = cfg_solver.min_lr + 0.5 * (cfg_solver.base_lr - cfg_solver.min_lr) * (
-                    1 + math.cos((epoch - cfg_solver.warmup_epoch) / (cfg_solver.epochs - cfg_solver.warmup_epoch) * math.pi))
+                1 + math.cos(
+            (epoch - cfg_solver.warmup_epoch) / (cfg_solver.epochs - cfg_solver.warmup_epoch) * math.pi))
     for param_group in optimizer.param_groups:
         if 'lr_scale' in param_group:
             param_group['lr'] = lr * param_group['lr_scale']
         else:
             param_group['lr'] = lr
+
+
+def frozen_backbone_lr(optimizer):
+    optimizer.param_groups[0]['lr'] = 0.0

@@ -17,9 +17,10 @@ dataset:
 train:
   log_dir: "./logs/"
   show_interval: 1
+  frozen_backbone_epoch: 2
 resume:
-  is_resume: True
-  resume_path: "/home/power/tx/FaceNeXt/logs/0806_0947_faceNeXt_tiny_finetune/model_5.pth"
+  is_resume: False
+#  resume_path: "/home/power/tx/FaceNeXt/logs/0806_0947_faceNeXt_tiny_finetune/model_5.pth"
 model:
   name: "faceNeXt_tiny"
   depth: [ 3, 3, 9, 3 ]
@@ -27,10 +28,9 @@ model:
   inner_scale: 1
   s: 64
   m: (1.0, 0.5, 0)
-  pretrain_path: "/home/power/tx/FaceNeXt/logs/0730_1709_faceNeXt_tiny_pretrain/model_20.pth"
+#  pretrain_path: "/home/power/tx/FaceNeXt/logs/0730_1709_faceNeXt_tiny_pretrain/model_20.pth"
+  pretrain_path: "/home/power/tx/FaceNeXt/logs/0823_1705_faceNeXt_tiny_pretrain/model_10.pth"
 eval:
   eval_datasets: [ 'lfw', 'agedb_30', 'cfp_fp' ]
-#  eval_datasets: [ 'lfw' ]
-  bin_root: "/data/tx/MS1MV3/"
-
+  bin_root: "/data/tx/MS1MV4/"
 print_model: False

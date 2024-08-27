@@ -97,7 +97,7 @@ def __generate_mask(img_size, patch_size, anno, mask_landmark_num=4):
     return mask
 
 
-def generate_landmark_mask(img_size, patch_size, anno, mask_landmark_num=4, mask_ratio=0.6):
+def generate_landmark_mask(img_size, patch_size, anno, mask_landmark_num=4, mask_ratio=0.6, device=torch.device('cuda')):
     """
     generate mask for landmark points
     randomly mask 4 points in 5 points
@@ -110,6 +110,7 @@ def generate_landmark_mask(img_size, patch_size, anno, mask_landmark_num=4, mask
         patch_size = patch_size[0]
     patch_num = img_size // patch_size
     masked_xy = torch.empty((bs, 5), dtype=torch.long)
+    anno.clamp(0, img_size - 1, out=anno)
     for i in range(5):
         masked_xy[:, i] = (anno[:, 2 * i + 5] * 7 // img_size) * patch_num + anno[:, 2 * i + 4] * 7 // img_size
     # random sample 4 points
@@ -122,11 +123,11 @@ def generate_landmark_mask(img_size, patch_size, anno, mask_landmark_num=4, mask
     indices = torch.cat([indices, masked_xy_], dim=1)
     mask = torch.full((bs, patch_num * patch_num), 1, dtype=torch.float32)
     mask[torch.arange(bs)[:, None], indices] = 0
-    return mask
+    return mask.to(device)
 
 
 def weights_to_sparse(state_dict):
     """
     input state_dict is non-sparse model params, out put a sparse model params
-
     """
+    pass

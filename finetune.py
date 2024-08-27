@@ -10,22 +10,27 @@ import torch
 from tqdm import tqdm
 from torch.cuda.amp import autocast, GradScaler
 
-from models import MBF, ArcHead
+from models import MBF
+from criterion import ArcHead
 from dataset import getDataloader
 from utils import (organize_model_weights,
                    adjust_learning_rate,
                    get_config,
                    print_config,
                    TensorboardLogger,
-                   EvaluateLogger)
+                   EvaluateLogger,
+                   frozen_backbone_lr)
 
 
 def train_one_epoch(model, head, optimizer, dataloader, epoch, logger, amp,  cfg):
     model.train()
     t = tqdm(dataloader, desc=f"Epoch: {epoch}/{cfg.solver.epochs} lr: 0.0 loss: 0.0", ncols=120)
     log_dict = {}
+
     for step_in_epoch, (img, _, label) in enumerate(t):
         adjust_learning_rate(optimizer, step_in_epoch / len(dataloader) + epoch, cfg)
+        if epoch <= cfg.train.frozen_backbone_epoch:
+            frozen_backbone_lr(optimizer)
         img = img.cuda()
         label = label.cuda()
         optimizer.zero_grad()

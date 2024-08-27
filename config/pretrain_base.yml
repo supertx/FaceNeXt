@@ -14,7 +14,9 @@ dataset:
   patch_size: 16
 train:
   log_dir: "./logs/"
-  show_interval: 1
+  show_interval: 500
+  start_face_loss_step: 40000
+  train_discriminator_step: 0
 resume:
   is_resume: False
   resume_path: ""

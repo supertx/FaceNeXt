@@ -7,7 +7,7 @@ from datetime import datetime
 
 import torch
 import timm.optim.optim_factory as optim_factory
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -16,31 +16,49 @@ import cv2 as cv
 from dataset import getDataloader
 from utils import adjust_learning_rate, get_config, print_config, unpatchify, patchify, TensorboardLogger
 from models import FaceMAE
+from criterion import PretrainLoss, DiscriminatorLoss, Discriminator
 
 
-def train_one_epoch(model, dataloader, optimizer, epoch, logger, cfg):
+def train_one_epoch(model,
+                    dataloader,
+                    optimizer,
+                    gan_optimizer,
+                    pretrain_loss,
+                    discriminator_loss,
+                    epoch,
+                    logger,
+                    cfg):
     model.train()
     t = tqdm(dataloader, desc=f"Epoch {epoch}/{cfg.solver.epochs} loss: 0.0", ncols=120)
-    show_flag = False
-    if epoch % cfg.train.show_interval == 0:
-        show_flag = True
     log_dict = {}
     for step_in_epoch, (img, anno, _) in enumerate(t):
         adjust_learning_rate(optimizer, step_in_epoch / len(dataloader) + epoch, cfg)
         img = img.cuda()
         anno.cuda()
         optimizer.zero_grad()
-        loss, pred, mask = model(img, anno)
+        pred, mask = model(img, anno)
+        f_loss, p_loss = pretrain_loss(img, pred, mask, step_in_epoch >= cfg.train.start_face_loss_step)
+        loss = f_loss + p_loss
         loss.backward()
         optimizer.step()
+        if step_in_epoch <= cfg.train.train_discriminator_step:
+            gan_optimizer.zero_grad()
+            g_loss = discriminator_loss(img, pred.detach())
+            g_loss.backward()
+            gan_optimizer.step()
         torch.cuda.empty_cache()
-        t.desc = f"Epoch {epoch}/{cfg.solver.epochs} lr: {optimizer.param_groups[0]['lr']:.2} loss: {loss.item()}"
-        log_dict['loss'] = loss.item()
+        if step_in_epoch <= cfg.train.train_discriminator_step:
+            t.desc = (f"Epoch {epoch}/{cfg.solver.epochs} lr: {optimizer.param_groups[0]['lr']:.2}" +
+                      f" p_loss: {p_loss.item():.2f} g_loss: {g_loss.item():.2f}")
+        else:
+            t.desc = (f"Epoch {epoch}/{cfg.solver.epochs} lr: {optimizer.param_groups[0]['lr']:.2}" +
+                      f" f_loss: {f_loss.item():.2f} p_loss: {p_loss.item():.2f}")
+        log_dict['f_loss'] = f_loss.item()
+        log_dict['p_loss'] = p_loss.item()
         log_dict['lr'] = optimizer.param_groups[0]['lr']
         logger.log_everything(log_dict, (epoch - 1) * len(dataloader) + step_in_epoch)
-    else:
-        if show_flag:
-            show(mask[0], img[0], pred[0], epoch, logger, cfg)
+        if step_in_epoch % cfg.train.show_interval == 0:
+            show(mask[0], img[0], pred[0], (epoch - 1) + step_in_epoch / len(dataloader), logger, cfg)
         logger.flush()
     t.close()
 
@@ -67,15 +85,22 @@ def train(args):
                     patch_size=cfg.dataset.patch_size,
                     mask_ratio=cfg.model.mask_ratio,
                     inner_scale=cfg.model.inner_scale)
+    discriminator = Discriminator(sn=True)
+    pretrain_loss = PretrainLoss(cfg, discriminator)
+    discriminator_loss = DiscriminatorLoss(discriminator)
     if cfg.print_model:
         print(model)
     model.cuda()
+    # model.load_state_dict(torch.load("/home/power/tx/FaceNeXt/logs/0730_1709_faceNeXt_tiny_pretrain/model_10.pth"))
+    discriminator.cuda()
     # compute params num
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("number of params:", n_parameters)
 
     param_groups = optim_factory.add_weight_decay(model, cfg.solver.weight_decay)
     optimizer = AdamW(param_groups, lr=cfg.solver.base_lr)
+    gan_optimizer = SGD(discriminator.parameters(), lr=cfg.solver.base_lr)
+    # AdamW()
     start_epoch = 1
     if cfg.resume.is_resume:
         check_point = torch.load(cfg.resume.resume_path)
@@ -83,7 +108,15 @@ def train(args):
         optimizer.load_state_dict(check_point["optimizer"])
         start_epoch = check_point["epoch"]
     for epoch in range(start_epoch, cfg.solver.epochs + 1):
-        train_one_epoch(model, dataloader, optimizer, epoch, logger, cfg)
+        train_one_epoch(model,
+                        dataloader,
+                        optimizer,
+                        gan_optimizer,
+                        pretrain_loss,
+                        discriminator_loss,
+                        epoch,
+                        logger,
+                        cfg)
         if epoch % 10 == 0:
             torch.save(model.state_dict(), os.path.join(log_dir, f"model_{epoch}.pth"))
             check_point = {
@@ -97,7 +130,7 @@ def train(args):
 
 
 def show(mask, img, img_pred, epoch, logger, cfg):
-    img_pred = unpatchify(img_pred, cfg.dataset.patch_size)
+    # img_pred = unpatchify(img_pred, cfg.dataset.patch_size)
     img_mask_infer, masked_img = mask_draw_pre(mask, img, img_pred)
     plt.figure(figsize=(12, 4))
     subplot = plt.subplot(1, 3, 1)

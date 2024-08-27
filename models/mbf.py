@@ -100,6 +100,14 @@ class MBF(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
+    def frozen(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfrozen(self):
+        for param in self.parameters():
+            param.requires_grad = True
+
     def forward(self, x):
         # with torch.cuda.amp.autocast(self.fp16):
         x = self.stem(x)

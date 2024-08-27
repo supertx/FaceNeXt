@@ -134,7 +134,8 @@ class FaceMAE(nn.Module):
 
     def forward(self, imgs, anno):
         mask = generate_landmark_mask(imgs.shape[2], self.patch_size, anno,
-                                      mask_landmark_num=self.mask_landmark_num, mask_ratio=self.mask_ratio)
+                                      mask_landmark_num=self.mask_landmark_num,
+                                      mask_ratio=self.mask_ratio, device=imgs.device)
         x = self.encoder(imgs, mask)
         pred = self.decoder(x, mask)
         # loss = self.compute_loss(imgs, pred, mask)

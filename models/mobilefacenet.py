@@ -100,18 +100,22 @@ class MobileFaceNet(Module):
             )
         else:
             self.layers.append(
-                Residual(64 * self.scale, num_block=blocks[0], groups=128, kernel=(3, 3), stride=(1, 1), padding=(1, 1)),
+                Residual(64 * self.scale, num_block=blocks[0], groups=128, kernel=(3, 3), stride=(1, 1),
+                         padding=(1, 1)),
             )
-        
+
         self.layers.extend(
-        [
-            DepthWise(64 * self.scale, 64 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=128),
-            Residual(64 * self.scale, num_block=blocks[1], groups=128, kernel=(3, 3), stride=(1, 1), padding=(1, 1)),
-            DepthWise(64 * self.scale, 128 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=256),
-            Residual(128 * self.scale, num_block=blocks[2], groups=256, kernel=(3, 3), stride=(1, 1), padding=(1, 1)),
-            DepthWise(128 * self.scale, 128 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=512),
-            Residual(128 * self.scale, num_block=blocks[3], groups=256, kernel=(3, 3), stride=(1, 1), padding=(1, 1)),
-        ])
+            [
+                DepthWise(64 * self.scale, 64 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=128),
+                Residual(64 * self.scale, num_block=blocks[1], groups=128, kernel=(3, 3), stride=(1, 1),
+                         padding=(1, 1)),
+                DepthWise(64 * self.scale, 128 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=256),
+                Residual(128 * self.scale, num_block=blocks[2], groups=256, kernel=(3, 3), stride=(1, 1),
+                         padding=(1, 1)),
+                DepthWise(128 * self.scale, 128 * self.scale, kernel=(3, 3), stride=(2, 2), padding=(1, 1), groups=512),
+                Residual(128 * self.scale, num_block=blocks[3], groups=256, kernel=(3, 3), stride=(1, 1),
+                         padding=(1, 1)),
+            ])
 
         self.conv_sep = ConvBlock(128 * self.scale, 512, kernel=(1, 1), stride=(1, 1), padding=(0, 0))
         self.features = GDC(num_features)
@@ -131,6 +135,14 @@ class MobileFaceNet(Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
+    def frozen(self):
+        for param in self.parameters():
+            param.requires_grad = False
+
+    def unfrozen(self):
+        for param in self.parameters():
+            param.requires_grad = True
+
     def forward(self, x):
         with torch.cuda.amp.autocast(self.fp16):
             for func in self.layers:
@@ -142,6 +154,7 @@ class MobileFaceNet(Module):
 
 def get_mbf(fp16, num_features, blocks=(1, 4, 6, 2), scale=2):
     return MobileFaceNet(fp16, num_features, blocks, scale=scale)
+
 
 def get_mbf_large(fp16, num_features, blocks=(2, 8, 12, 4), scale=4):
     return MobileFaceNet(fp16, num_features, blocks, scale=scale)

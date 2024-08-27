@@ -34,8 +34,8 @@ def compute_pixel_loss(imgs, pred, mask, norm_pix_loss=True):
     pred: (N, C * patch_size **2, h * w) -> (N, C, p * h, p * w)
     mask: (N, L) 1 is masked
     """
-    patch_size = int((pred.shape[1] / 3) ** 0.5)
     if len(pred.shape) == 3:
+        patch_size = int((pred.shape[1] / 3) ** 0.5)
         pred = rearrange(pred, 'n (c p q) (h w) -> n c (p h) (q w)', p=patch_size, q=patch_size,
                          h=imgs.shape[2] // patch_size, w=imgs.shape[3] // patch_size)
     # 根据每个patch进行归一化
@@ -44,10 +44,10 @@ def compute_pixel_loss(imgs, pred, mask, norm_pix_loss=True):
         var = imgs.var(dim=(2, 3), keepdim=True)
         imgs = (imgs - mean) / (var + 1e-6) ** .5
     loss = (pred - imgs) ** 2
-    loss = loss.mean(dim=-1)
-    mask = rearrange(mask, 'n (h w) -> n 1 h w', h=imgs.shape[2] // patch_size, w=imgs.shape[3] // patch_size)
+    # loss = loss.mean(dim=-1)
+    mask = rearrange(mask, 'n (h w) -> n 1 h w', h=int(mask.shape[1] ** 0.5))
     mask = F.interpolate(mask, size=(imgs.shape[2], imgs.shape[3]), mode='nearest')
-    loss = (loss * mask).sum() / mask.sum()
+    loss = (loss * mask).sum() / mask.sum() / 3
     return loss
 
 
@@ -67,16 +67,18 @@ class PretrainLoss(nn.Module):
         else:
             self.weight_dict = weight_dict
 
-    def forward(self, raw_img, pred_img, mask):
-        raw_logits = self.arcface(raw_img)
-        pred_logits = self.arcface(pred_img)
-        torch.cuda.empty_cache()
-        arcface_loss = fcd_loss(raw_logits, pred_logits)
-        gan_loss = self.gan_loss(self.discriminator(pred_img), torch.zeros(pred_img.size(0), 1).to(pred_img.device))
+    def forward(self, raw_img, pred_img, mask, face_loss=True):
+        arcface_loss = torch.zeros(1).to(raw_img.device)
+        if face_loss:
+            with torch.no_grad():
+                raw_logits = self.arcface(raw_img)
+            pred_logits = self.arcface(pred_img)
+            arcface_loss = fcd_loss(raw_logits, pred_logits)
+        # gan_loss = self.gan_loss(self.discriminator(pred_img), torch.ones(pred_img.size(0), 1).to(pred_img.device))
         pixel_loss = compute_pixel_loss(raw_img, pred_img, mask)
         return (self.weight_dict['arcface'] * arcface_loss
-                + self.weight_dict['gan'] * gan_loss
-                + self.weight_dict['pixel'] * pixel_loss)
+                # + self.weight_dict['gan'] * gan_loss
+                , self.weight_dict['pixel'] * pixel_loss)
 
 
 class DiscriminatorLoss(nn.Module):
